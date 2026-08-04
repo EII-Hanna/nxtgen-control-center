@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/**'
+      - 'supabase/functions/**'
       - '.github/workflows/deploy-supabase.yml'
 
 permissions:
@@ -57,3 +58,6 @@ jobs:
 
       - name: Stabilen Datenbankkern deployen
         run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Lead Intake Webhook deployen
+        run: supabase functions deploy lead-intake --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
