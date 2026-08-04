@@ -8,10 +8,16 @@
   const title = document.getElementById('authTitle');
   const subtitle = document.getElementById('authSubtitle');
   const message = document.getElementById('authMessage');
+  const nameInput = document.getElementById('authName');
+  const emailInput = document.getElementById('authEmail');
+  const passwordInput = document.getElementById('authPassword');
+  const submitButton = authForm?.querySelector('button[type="submit"]');
+  const nameLabel = nameInput?.previousElementSibling;
 
   let registerMode = false;
   let bootstrapPromise = null;
   let db = null;
+  let opening = false;
 
   const setMessage = (text = '', type = '') => {
     if (!message) return;
@@ -24,35 +30,91 @@
     new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} hat zu lange gedauert.`)), ms))
   ]);
 
+  const setLoading = (loading, text = '') => {
+    if (!submitButton) return;
+    submitButton.disabled = loading;
+    submitButton.textContent = loading ? text : (registerMode ? 'Account erstellen' : 'NXTGEN öffnen');
+  };
+
   const showApp = () => {
+    opening = true;
     setup?.classList.add('hidden');
     app?.classList.remove('hidden');
     window.dispatchEvent(new CustomEvent('nxtgen:ready'));
   };
 
+  const ensureRecoveryButton = () => {
+    if (!authForm || document.getElementById('authForgot')) return;
+    const button = document.createElement('button');
+    button.id = 'authForgot';
+    button.type = 'button';
+    button.className = 'auth-link';
+    button.textContent = 'Passwort vergessen?';
+    button.addEventListener('click', async () => {
+      const email = emailInput?.value.trim();
+      if (!email) {
+        setMessage('Trage zuerst deine E-Mail-Adresse ein.', 'error');
+        emailInput?.focus();
+        return;
+      }
+      button.disabled = true;
+      button.textContent = 'Reset-Link wird gesendet …';
+      try {
+        const { error } = await withTimeout(
+          db.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + window.location.pathname
+          }),
+          12000,
+          'Passwort-Reset'
+        );
+        if (error) throw error;
+        setMessage('Reset-Link wurde gesendet. Prüfe auch den Spam-Ordner.', 'success');
+      } catch (error) {
+        setMessage(error.message || 'Reset-Link konnte nicht gesendet werden.', 'error');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Passwort vergessen?';
+      }
+    });
+    authForm.appendChild(button);
+  };
+
   const showAuth = () => {
+    opening = false;
     setup?.classList.remove('hidden');
     app?.classList.add('hidden');
     authForm?.classList.remove('hidden');
     orgForm?.classList.add('hidden');
     toggle?.classList.remove('hidden');
+
+    if (nameInput) {
+      nameInput.classList.toggle('hidden', !registerMode);
+      nameInput.required = registerMode;
+    }
+    nameLabel?.classList.toggle('hidden', !registerMode);
+
     if (title) title.textContent = registerMode ? 'NXTGEN Account erstellen' : 'Bei NXTGEN anmelden';
     if (subtitle) {
       subtitle.textContent = registerMode
         ? 'Registriere deinen Administratorzugang. Nach Bestätigung genügt die normale Anmeldung.'
-        : 'Melde dich mit deiner bestätigten E-Mail-Adresse an.';
+        : 'Melde dich mit deinem bestehenden NXTGEN-Administratorzugang an.';
     }
     if (toggle) toggle.textContent = registerMode ? 'Bereits registriert? Anmelden' : 'Noch kein Konto? Registrieren';
+
+    ensureRecoveryButton();
+    document.getElementById('authForgot')?.classList.toggle('hidden', registerMode);
+    setLoading(false);
   };
 
   const showRecovery = error => {
+    opening = false;
     setup?.classList.remove('hidden');
     app?.classList.add('hidden');
     authForm?.classList.add('hidden');
     orgForm?.classList.add('hidden');
     toggle?.classList.add('hidden');
-    if (title) title.textContent = 'Verbindung konnte nicht abgeschlossen werden';
-    if (subtitle) subtitle.textContent = 'Die Sitzung ist vorhanden, aber der Organisationszugriff konnte nicht rechtzeitig geladen werden.';
+    if (title) title.textContent = 'NXTGEN konnte nicht geöffnet werden';
+    if (subtitle) subtitle.textContent = 'Die Anmeldung war erfolgreich, aber der Organisationszugriff konnte nicht geladen werden.';
     setMessage(
       `<div>${String(error?.message || 'Unbekannter Startfehler')}</div>` +
       '<div class="auth-recovery-actions">' +
@@ -113,6 +175,7 @@
   };
 
   const bootstrapAndOpen = () => {
+    if (opening) return Promise.resolve();
     if (bootstrapPromise) return bootstrapPromise;
 
     bootstrapPromise = (async () => {
@@ -142,64 +205,65 @@
     return bootstrapPromise;
   };
 
-  if (toggle) {
-    toggle.onclick = () => {
-      registerMode = !registerMode;
-      setMessage('');
-      showAuth();
-    };
-  }
+  toggle?.addEventListener('click', () => {
+    registerMode = !registerMode;
+    setMessage('');
+    showAuth();
+  });
 
-  if (authForm) {
-    authForm.onsubmit = async event => {
-      event.preventDefault();
-      setMessage('');
+  authForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    setMessage('');
 
-      const email = document.getElementById('authEmail').value.trim();
-      const password = document.getElementById('authPassword').value;
-      const fullName = document.getElementById('authName').value.trim();
+    const email = emailInput?.value.trim() || '';
+    const password = passwordInput?.value || '';
+    const fullName = nameInput?.value.trim() || '';
 
-      try {
-        if (registerMode) {
-          const { data, error } = await withTimeout(db.auth.signUp({
-            email,
-            password,
-            options: {
-              data: { full_name: fullName },
-              emailRedirectTo: window.location.origin + window.location.pathname
-            }
-          }), 12000, 'Registrierung');
+    try {
+      if (!email || !password) throw new Error('E-Mail und Passwort sind erforderlich.');
+      setLoading(true, registerMode ? 'Account wird erstellt …' : 'Anmeldung läuft …');
 
-          if (error) throw error;
-          if (data.session) await bootstrapAndOpen();
-          else {
-            registerMode = false;
-            showAuth();
-            setMessage('E-Mail bestätigt? Dann jetzt einfach anmelden.', 'success');
+      if (registerMode) {
+        if (!fullName) throw new Error('Bitte deinen vollständigen Namen eintragen.');
+        const { data, error } = await withTimeout(db.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: fullName },
+            emailRedirectTo: window.location.origin + window.location.pathname
           }
-          return;
-        }
+        }), 12000, 'Registrierung');
 
-        const { error } = await withTimeout(
-          db.auth.signInWithPassword({ email, password }),
-          12000,
-          'Anmeldung'
-        );
         if (error) throw error;
-        await bootstrapAndOpen();
-      } catch (error) {
-        setMessage(error.message || 'Anmeldung fehlgeschlagen.', 'error');
+        if (data.session) await bootstrapAndOpen();
+        else {
+          registerMode = false;
+          showAuth();
+          setMessage('Bestätige deine E-Mail und melde dich danach an.', 'success');
+        }
+        return;
       }
-    };
-  }
+
+      const { data, error } = await withTimeout(
+        db.auth.signInWithPassword({ email, password }),
+        12000,
+        'Anmeldung'
+      );
+      if (error) throw error;
+      if (!data.session) throw new Error('Supabase hat keine gültige Sitzung zurückgegeben.');
+      await bootstrapAndOpen();
+    } catch (error) {
+      setMessage(error.message || 'Anmeldung fehlgeschlagen.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  });
 
   orgForm?.classList.add('hidden');
 
   db.auth.onAuthStateChange(event => {
-    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-      setTimeout(() => bootstrapAndOpen(), 0);
-    }
     if (event === 'SIGNED_OUT') {
+      opening = false;
       bootstrapPromise = null;
       showAuth();
     }
