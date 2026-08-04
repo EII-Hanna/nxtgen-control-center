@@ -14,9 +14,11 @@
   loadAsset('style','./lead-crm.css');
   loadAsset('style','./offer-builder.css');
   loadAsset('style','./integrations.css');
+  loadAsset('style','./sales-task-center.css');
   loadAsset('script','./lead-crm.js');
   loadAsset('script','./offer-builder.js');
   loadAsset('script','./integrations.js');
+  loadAsset('script','./sales-task-center.js');
 
   async function loadDashboard(){
     const db=window.NXTGEN_DB, org=window.NXTGEN_ORG_ID; if(!db||!org)return;
