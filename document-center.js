@@ -31,6 +31,13 @@
     list.querySelectorAll('[data-action]').forEach(btn=>btn.onclick=()=>handle(btn.closest('[data-id]'),btn.dataset.action));
   }
 
+  async function provisionFinance(id){
+    const {data,error}=await window.NXTGEN_DB.rpc('provision_finance_from_contract',{p_package_id:id});
+    if(error)throw error;
+    window.dispatchEvent(new CustomEvent('nxtgen:finance-updated',{detail:data||{}}));
+    return data;
+  }
+
   async function handle(row,action){
     const id=row.dataset.id; const p=packages.find(x=>x.id===id); if(!p)return;
     try{
@@ -50,14 +57,16 @@
       if(action==='signed'){
         const signingUrl=prompt('Optional: Signatur- oder Abschlusslink einfügen',p.signing_url||'');
         const {error}=await window.NXTGEN_DB.rpc('mark_contract_signed',{p_package_id:id,p_signing_url:signingUrl||null});if(error)throw error;
-        message('Vertrag wurde als unterschrieben markiert. Der Zahlungslink kann jetzt versendet werden.');
+        const finance=await provisionFinance(id);
+        message(`Vertrag signiert. Vertragskonto, Setup-Rechnung und Billing-Plan wurden vorbereitet. Activation Gate: ${String(finance?.activation_gate_id||'').slice(0,8)}.`);
       }
       if(action==='payment'){
         const provider=row.querySelector('[data-payment-provider]').value;
         const url=row.querySelector('[data-payment-url]').value.trim();
         if(!/^https?:\/\//i.test(url))throw new Error('Bitte einen vollständigen CopeCart- oder Stripe-Link eintragen.');
         const {error}=await window.NXTGEN_DB.from('contract_packages').update({payment_provider:provider,payment_url:url,payment_status:'ready',updated_at:new Date().toISOString()}).eq('id',id);if(error)throw error;
-        message('Zahlungslink wurde am Vertragspaket gespeichert.');
+        if(p.signed_at)await provisionFinance(id);
+        message('Zahlungslink wurde gespeichert und mit der Setup-Rechnung synchronisiert.');
       }
       await load();
     }catch(e){message(e.message||'Aktion fehlgeschlagen.')}
