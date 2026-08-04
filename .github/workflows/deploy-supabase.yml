@@ -46,6 +46,14 @@ jobs:
 
       - name: Edge Functions deployen
         run: |
-          if [ -d "supabase/functions/fireflies-webhook" ]; then
-            supabase functions deploy fireflies-webhook --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
-          fi
+          for function_dir in supabase/functions/*; do
+            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
+              function_name=$(basename "$function_dir")
+              echo "Deploying $function_name"
+              if [ "$function_name" = "fireflies-webhook" ] || [ "$function_name" = "delivery-automation-callback" ]; then
+                supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+              else
+                supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_REF"
+              fi
+            fi
+          done
