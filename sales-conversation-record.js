@@ -1,7 +1,7 @@
 (() => {
   const db = () => window.NXTGEN_DB;
   const org = () => window.NXTGEN_ORG_ID;
-  const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[c]));
   const arr = v => Array.isArray(v) ? v : [];
 
   async function getLead(id) {
@@ -11,9 +11,17 @@
   }
 
   async function getMeeting(leadId) {
-    const { data, error } = await db().from('meeting_records').select('*').eq('lead_id', leadId).eq('organization_id', org()).order('created_at',{ascending:false}).limit(1);
-    if (error && error.code !== '42P01') throw error;
-    return data?.[0] || null;
+    try {
+      const { data, error } = await db().from('meeting_records').select('*').eq('lead_id', leadId).eq('organization_id', org()).order('created_at',{ascending:false}).limit(1);
+      if (error) {
+        console.warn('Meeting-Daten noch nicht verfügbar:', error.message);
+        return null;
+      }
+      return data?.[0] || null;
+    } catch (error) {
+      console.warn('Meeting-Daten konnten nicht geladen werden:', error);
+      return null;
+    }
   }
 
   function field(label, value, tone='') {
@@ -23,13 +31,13 @@
   function openModal(lead, meeting) {
     document.querySelector('.cr-backdrop')?.remove();
     const score = Number(meeting?.qualification_score || 0);
-    const status = meeting?.analysis_status || 'queued';
+    const status = meeting?.analysis_status || 'waiting';
     const provider = meeting?.provider || 'zoom';
     const wrap = document.createElement('div');
     wrap.className = 'cr-backdrop';
     wrap.innerHTML = `<section class="cr-modal">
       <header class="cr-head">
-        <div><span class="cr-kicker">SALES / GESPRÄCHSAKTE</span><h2>Gesprächsakte</h2><div class="cr-ai-badge">✦ ${provider === 'fireflies' ? 'Fireflies AI' : 'Zoom + NXTGEN AI'} · ${status === 'ready' ? 'Gespräch ausgewertet' : 'Verarbeitung vorbereitet'}</div></div>
+        <div><span class="cr-kicker">SALES / GESPRÄCHSAKTE</span><h2>Gesprächsakte</h2><div class="cr-ai-badge">✦ ${provider === 'fireflies' ? 'Fireflies AI' : 'Zoom + NXTGEN AI'} · ${status === 'ready' ? 'Gespräch ausgewertet' : 'Warte auf Meeting-Verarbeitung'}</div></div>
         <div class="cr-score"><span>Deal Readiness</span><strong>${score}%</strong></div>
         <button class="cr-close" aria-label="Schließen">×</button>
       </header>
@@ -46,9 +54,9 @@
       </div>
       <div class="cr-bottom">
         <article class="cr-actions"><span>WESENTLICHE ACTION ITEMS</span>${arr(meeting?.action_items).length ? arr(meeting.action_items).map(x=>`<p>✓ ${esc(typeof x==='string'?x:(x.title||x.text||JSON.stringify(x)))}</p>`).join('') : '<p>○ Noch keine Action Items erkannt</p>'}</article>
-        <article class="cr-ai-note"><span>KI-HINWEIS</span><p>${status==='ready' ? 'Die Akte wurde aus Transkript und Meeting-Kontext erzeugt. Menschliche Prüfung bleibt erforderlich.' : 'Nach Ende des Zoom-Calls triggert der Webhook die Transkriptions- und Analyse-Automation.'}</p></article>
+        <article class="cr-ai-note"><span>KI-HINWEIS</span><p>${status==='ready' ? 'Die Akte wurde aus Transkript und Meeting-Kontext erzeugt. Menschliche Prüfung bleibt erforderlich.' : 'Nach Ende des Zoom-Calls triggert der Webhook die Transkriptions- und Analyse-Automation. Die Akte ist bereits für den Lead vorbereitet.'}</p></article>
       </div>
-      <footer class="cr-footer"><div><span class="cr-provider-dot"></span>${status==='ready'?'Transkript & Analyse verfügbar':'Warte auf Meeting-Webhook'}</div><div class="cr-footer-actions"><button class="ui-btn ghost cr-refresh">Aktualisieren</button>${meeting?.transcript_url?`<a class="ui-btn primary" href="${esc(meeting.transcript_url)}" target="_blank" rel="noopener">Transkript öffnen ↗</a>`:''}</div></footer>
+      <footer class="cr-footer"><div><span class="cr-provider-dot"></span>${status==='ready'?'Transkript & Analyse verfügbar':'Gesprächsakte bereit · wartet auf Webhook'}</div><div class="cr-footer-actions"><button class="ui-btn ghost cr-refresh">Aktualisieren</button>${meeting?.transcript_url?`<a class="ui-btn primary" href="${esc(meeting.transcript_url)}" target="_blank" rel="noopener">Transkript öffnen ↗</a>`:''}</div></footer>
     </section>`;
     document.body.appendChild(wrap);
     wrap.querySelector('.cr-close').onclick = () => wrap.remove();
@@ -62,10 +70,16 @@
 
   async function openForLead(id) {
     try {
-      const [lead, meeting] = await Promise.all([getLead(id), getMeeting(id)]);
-      openModal(lead, meeting);
+      const lead = await getLead(id);
+      openModal(lead, null);
+      const meeting = await getMeeting(id);
+      if (meeting) {
+        document.querySelector('.cr-backdrop')?.remove();
+        openModal(lead, meeting);
+      }
     } catch (error) {
       console.error('Gesprächsakte konnte nicht geladen werden', error);
+      alert(`Gesprächsakte konnte nicht geöffnet werden: ${error.message || error}`);
     }
   }
 
