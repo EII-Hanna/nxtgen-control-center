@@ -8,6 +8,7 @@
   const title = document.getElementById('authTitle');
   const subtitle = document.getElementById('authSubtitle');
   const message = document.getElementById('authMessage');
+  const appUrl = `${window.location.origin}${window.location.pathname}`;
 
   const showApp = () => {
     setup.classList.add('hidden');
@@ -32,7 +33,12 @@
   window.NXTGEN_DB = db;
   let registerMode = false;
 
-  const showAuth = () => {
+  const setMessage = (text = '', type = '') => {
+    message.className = type ? `auth-message ${type}` : 'auth-message';
+    message.textContent = text;
+  };
+
+  const showAuth = (notice = '') => {
     setup.classList.remove('hidden');
     app.classList.add('hidden');
     authForm.classList.remove('hidden');
@@ -40,16 +46,40 @@
     toggle.classList.remove('hidden');
     title.textContent = registerMode ? 'NXTGEN Account erstellen' : 'Bei NXTGEN anmelden';
     subtitle.textContent = registerMode ? 'Erstelle deinen internen Administratorzugang.' : 'Melde dich in deinem Company OS an.';
+    if (notice) setMessage(notice, 'success');
+  };
+
+  const showOrgSetup = () => {
+    setup.classList.remove('hidden');
+    app.classList.add('hidden');
+    authForm.classList.add('hidden');
+    toggle.classList.add('hidden');
+    orgForm.classList.remove('hidden');
+    title.textContent = 'Interne Organisation anlegen';
+    subtitle.textContent = 'Lege NXTGEN als zentrale Betreiberorganisation an.';
+    setMessage('');
   };
 
   const checkOrg = async () => {
+    const { data: sessionData } = await db.auth.getSession();
+    if (!sessionData.session) {
+      registerMode = false;
+      showAuth('Deine E-Mail ist bestätigt. Bitte melde dich jetzt einmal an.');
+      return;
+    }
+
     const { data, error } = await db.rpc('my_organizations');
-    if (error || !data?.length) {
-      authForm.classList.add('hidden');
-      toggle.classList.add('hidden');
-      orgForm.classList.remove('hidden');
-      title.textContent = 'Interne Organisation anlegen';
-      subtitle.textContent = 'Lege NXTGEN als zentrale Betreiberorganisation an.';
+    if (error) {
+      if (/jwt|session|not authenticated|nicht angemeldet/i.test(error.message || '')) {
+        await db.auth.signOut();
+        showAuth('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+        return;
+      }
+      setMessage(error.message || 'Organisation konnte nicht geprüft werden.', 'error');
+      return;
+    }
+    if (!data?.length) {
+      showOrgSetup();
       return;
     }
     window.NXTGEN_ORG_ID = data[0].organization_id;
@@ -64,16 +94,37 @@
 
   authForm.onsubmit = async e => {
     e.preventDefault();
-    message.textContent = '';
+    setMessage('');
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     const fullName = document.getElementById('authName').value.trim();
-    const result = registerMode
-      ? await db.auth.signUp({ email, password, options:{ data:{ full_name:fullName } } })
-      : await db.auth.signInWithPassword({ email, password });
-    if (result.error) {
-      message.className = 'auth-message';
-      message.textContent = result.error.message;
+
+    if (registerMode) {
+      const { data, error } = await db.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName },
+          emailRedirectTo: appUrl
+        }
+      });
+      if (error) {
+        setMessage(error.message, 'error');
+        return;
+      }
+      if (!data.session) {
+        registerMode = false;
+        toggle.textContent = 'Noch kein Konto? Registrieren';
+        showAuth('Bestätigungs-E-Mail versendet. Nach der Bestätigung bitte hier anmelden.');
+        return;
+      }
+      await checkOrg();
+      return;
+    }
+
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+      setMessage(error.message, 'error');
       return;
     }
     await checkOrg();
@@ -81,19 +132,42 @@
 
   orgForm.onsubmit = async e => {
     e.preventDefault();
-    message.textContent = '';
+    setMessage('');
+    const { data: sessionData } = await db.auth.getSession();
+    if (!sessionData.session) {
+      registerMode = false;
+      showAuth('Bitte melde dich zuerst an.');
+      return;
+    }
+
     const { data, error } = await db.rpc('create_internal_organization', {
       p_name: document.getElementById('orgName').value.trim(),
       p_slug: document.getElementById('orgSlug').value.trim()
     });
     if (error) {
-      message.className = 'auth-message';
-      message.textContent = error.message;
+      setMessage(error.message, 'error');
       return;
     }
     window.NXTGEN_ORG_ID = data;
     showApp();
   };
 
-  db.auth.getSession().then(({ data }) => data.session ? checkOrg() : showAuth());
+  db.auth.onAuthStateChange((event, session) => {
+    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+      window.setTimeout(checkOrg, 0);
+    }
+    if (event === 'SIGNED_OUT') {
+      registerMode = false;
+      showAuth();
+    }
+  });
+
+  db.auth.getSession().then(({ data, error }) => {
+    if (error) {
+      setMessage(error.message, 'error');
+      showAuth();
+      return;
+    }
+    data.session ? checkOrg() : showAuth();
+  });
 })();
