@@ -2,7 +2,7 @@
   const db = () => window.NXTGEN_DB;
   const org = () => window.NXTGEN_ORG_ID;
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const arr = v => Array.isArray(v) ? v : [];
+  const asList = v => Array.isArray(v) ? v : [];
 
   async function getLead(id) {
     const { data, error } = await db().from('leads').select('*').eq('id', id).eq('organization_id', org()).single();
@@ -15,87 +15,91 @@
       const { data, error } = await db().from('meeting_records').select('*').eq('lead_id', leadId).eq('organization_id', org()).order('created_at',{ascending:false}).limit(1);
       if (error) return null;
       return data?.[0] || null;
-    } catch (_) {
-      return null;
-    }
+    } catch { return null; }
   }
 
   const value = (v, fallback='Noch nicht erkannt') => esc(v || fallback);
+  const compactDate = v => v ? new Intl.DateTimeFormat('de-DE',{dateStyle:'short',timeStyle:'short'}).format(new Date(v)) : '—';
 
-  function openModal(lead, meeting) {
-    document.querySelector('.cr-backdrop')?.remove();
+  function closeRecord() {
+    document.querySelector('.ncr-shell')?.remove();
+    document.body.classList.remove('ncr-open');
+  }
+
+  function openRecord(lead, meeting) {
+    closeRecord();
+    document.body.classList.add('ncr-open');
     const score = Math.max(0, Math.min(100, Number(meeting?.qualification_score || 0)));
-    const status = meeting?.analysis_status || 'waiting';
-    const provider = meeting?.provider || 'zoom';
-    const actionItems = arr(meeting?.action_items);
-    const wrap = document.createElement('div');
-    wrap.className = 'cr-backdrop';
-    wrap.innerHTML = `<section class="cr-modal cr-compact">
-      <button class="cr-close" aria-label="Schließen">×</button>
+    const ready = meeting?.analysis_status === 'ready';
+    const actions = asList(meeting?.action_items);
+    const shell = document.createElement('div');
+    shell.className = 'ncr-shell';
+    shell.innerHTML = `
+      <div class="ncr-stage">
+        <section class="ncr-modal" role="dialog" aria-modal="true" aria-label="Gesprächsakte">
+          <header class="ncr-header">
+            <div class="ncr-title-wrap">
+              <div class="ncr-title-line"><span class="ncr-folder">□</span><h2>Gesprächsakte</h2></div>
+              <div class="ncr-ai-pill">✦ ${ready ? 'NXTGEN AI · Gespräch automatisch transkribiert & ausgewertet' : 'Zoom + NXTGEN AI · Warte auf Meeting-Verarbeitung'}</div>
+            </div>
+            <div class="ncr-readiness">
+              <div><span>QUALIFIZIERUNG</span><strong>Deal Readiness</strong><small>${ready ? 'Aktuelle Bewertung' : 'Frühe Phase'}</small></div>
+              <div class="ncr-ring" style="--score:${score}"><b>${score}%</b></div>
+            </div>
+            <button class="ncr-close" aria-label="Schließen">×</button>
+          </header>
 
-      <header class="cr-head">
-        <div class="cr-title-block">
-          <span class="cr-kicker">SALES / GESPRÄCHSAKTE</span>
-          <h2><span class="cr-folder">▱</span> Gesprächsakte</h2>
-          <div class="cr-ai-badge">✦ ${provider === 'fireflies' ? 'Fireflies AI' : 'Zoom + NXTGEN AI'} · ${status === 'ready' ? 'Gespräch ausgewertet' : 'Warte auf Meeting-Verarbeitung'}</div>
-        </div>
-        <div class="cr-readiness">
-          <div><small>QUALIFIZIERUNG</small><b>Deal Readiness</b><span>${status === 'ready' ? 'Aktueller Stand' : 'Frühe Phase'}</span></div>
-          <div class="cr-ring" style="--score:${score}"><strong>${score}%</strong></div>
-        </div>
-      </header>
+          <section class="ncr-company">
+            <div class="ncr-company-main">
+              <div class="ncr-avatar">${esc((lead.company_name || 'N').slice(0,1).toUpperCase())}</div>
+              <div><span>LEAD / UNTERNEHMEN</span><strong>${value(lead.company_name,'Unbekanntes Unternehmen')}</strong><small>${value(lead.contact_name || lead.email,'Kein Ansprechpartner')}</small></div>
+            </div>
+            <div class="ncr-company-meta">
+              <div><span>Quelle</span><b>${value(lead.source,'manual')}</b></div>
+              <div><span>Status</span><b>${value(lead.stage,'new')}</b></div>
+              <div><span>Termin</span><b>${compactDate(lead.meeting_at)}</b></div>
+            </div>
+          </section>
 
-      <section class="cr-company">
-        <div class="cr-company-main">
-          <div class="cr-avatar">${esc((lead.company_name || 'N').slice(0,1).toUpperCase())}</div>
-          <div><small>LEAD / UNTERNEHMEN</small><h3>${value(lead.company_name,'Unbekannt')}</h3><p>${value(lead.contact_name || lead.email,'Kein Ansprechpartner')}</p></div>
-        </div>
-        <div class="cr-meta"><span>Quelle<b>${value(lead.source,'manual')}</b></span><span>Status<b>${value(lead.stage,'new')}</b></span><span>Termin<b>${lead.meeting_at ? new Date(lead.meeting_at).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}) : '—'}</b></span></div>
-      </section>
+          <section class="ncr-grid ncr-grid-top">
+            <article class="ncr-card ncr-accent-green"><span>✦ GESPRÄCHSZUSAMMENFASSUNG</span><p>${value(meeting?.summary)}</p></article>
+            <article class="ncr-card"><span>◌ AKTUELLER PROZESS</span><p>${value(meeting?.current_process)}</p></article>
+            <article class="ncr-card ncr-accent-amber"><span>△ KERNPROBLEM</span><p>${value(meeting?.core_problem)}</p></article>
+            <article class="ncr-card ncr-accent-blue"><span>◎ ZIELBILD</span><p>${value(meeting?.target_state)}</p></article>
+          </section>
 
-      <section class="cr-grid cr-grid-primary">
-        <article class="cr-field cr-summary"><span>✦ GESPRÄCHSZUSAMMENFASSUNG</span><p>${value(meeting?.summary)}</p></article>
-        <article class="cr-field"><span>⌁ AKTUELLER PROZESS</span><p>${value(meeting?.current_process)}</p></article>
-        <article class="cr-field cr-problem"><span>△ KERNPROBLEM</span><p>${value(meeting?.core_problem)}</p></article>
-        <article class="cr-field cr-target"><span>◎ ZIELBILD</span><p>${value(meeting?.target_state)}</p></article>
-      </section>
+          <section class="ncr-grid ncr-grid-metrics">
+            <article class="ncr-mini"><span>♙ ENTSCHEIDER</span><strong>${value(meeting?.decision_maker || lead.contact_name,'Noch nicht erkannt')}</strong><small>${value(meeting?.decision_maker_role,'')}</small></article>
+            <article class="ncr-mini"><span>ϟ DRINGLICHKEIT</span><strong>${value(meeting?.urgency)}</strong></article>
+            <article class="ncr-mini"><span>€ BUDGETRAHMEN</span><strong>${value(meeting?.budget_range)}</strong></article>
+            <article class="ncr-mini"><span>□ NÄCHSTER SCHRITT</span><strong>${value(meeting?.next_step || lead.next_step)}</strong></article>
+          </section>
 
-      <section class="cr-grid cr-grid-secondary">
-        <article class="cr-field cr-small"><span>♙ ENTSCHEIDER</span><p>${value(meeting?.decision_maker || lead.contact_name)}</p></article>
-        <article class="cr-field cr-small"><span>ϟ DRINGLICHKEIT</span><p>${value(meeting?.urgency)}</p></article>
-        <article class="cr-field cr-small"><span>€ BUDGETRAHMEN</span><p>${value(meeting?.budget_range)}</p></article>
-        <article class="cr-field cr-small"><span>▣ NÄCHSTER SCHRITT</span><p>${value(meeting?.next_step || lead.next_step)}</p></article>
-      </section>
+          <section class="ncr-lower">
+            <article class="ncr-actions"><span>WESENTLICHE ACTION ITEMS</span>${actions.length ? actions.map(item => `<p>✓ ${esc(typeof item === 'string' ? item : item.title || item.text || 'Action Item')}</p>`).join('') : '<p>○ Noch keine Action Items erkannt</p>'}</article>
+            <article class="ncr-note"><span>✦ KI-HINWEIS</span><p>${ready ? 'Die Gesprächsakte wurde automatisch aus Transkript und Meeting-Kontext erstellt. Menschliche Prüfung bleibt erforderlich.' : 'Nach Ende des Zoom-Calls triggert der Webhook die Transkriptions- und Analyse-Automation.'}</p></article>
+          </section>
 
-      <section class="cr-bottom">
-        <article class="cr-actions"><span>WESENTLICHE ACTION ITEMS</span>${actionItems.length ? actionItems.slice(0,4).map(x=>`<p>✓ ${esc(typeof x === 'string' ? x : (x.title || x.text || JSON.stringify(x)))}</p>`).join('') : '<p>○ Noch keine Action Items erkannt</p>'}</article>
-        <article class="cr-ai-note"><span>✦ KI-HINWEIS</span><p>${status === 'ready' ? 'Akte aus Transkript und Meeting-Kontext erzeugt. Menschliche Prüfung bleibt erforderlich.' : 'Nach Ende des Zoom-Calls triggert der Webhook Transkription und Analyse.'}</p></article>
-      </section>
-
-      <footer class="cr-footer"><div><span class="cr-provider-dot"></span>${status === 'ready' ? 'Transkript & Analyse verfügbar' : 'Gesprächsakte bereit · wartet auf Webhook'}</div><div class="cr-footer-actions"><button class="ui-btn ghost cr-refresh">Aktualisieren</button>${meeting?.transcript_url ? `<a class="ui-btn primary" href="${esc(meeting.transcript_url)}" target="_blank" rel="noopener">Transkript öffnen ↗</a>` : ''}</div></footer>
-    </section>`;
-    document.body.appendChild(wrap);
-    wrap.querySelector('.cr-close').onclick = () => wrap.remove();
-    wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
-    wrap.querySelector('.cr-refresh').onclick = async () => {
-      const fresh = await getMeeting(lead.id);
-      wrap.remove();
-      openModal(lead, fresh);
-    };
+          <footer class="ncr-footer">
+            <div><i></i>${ready ? 'Transkript & Analyse verfügbar' : 'Gesprächsakte vorbereitet · wartet auf Webhook'}</div>
+            <div><span>${meeting?.updated_at ? `Zuletzt aktualisiert: ${compactDate(meeting.updated_at)}` : ''}</span><button class="ncr-refresh">Aktualisieren</button>${meeting?.transcript_url ? `<a href="${esc(meeting.transcript_url)}" target="_blank" rel="noopener">Transkript öffnen ↗</a>` : ''}</div>
+          </footer>
+        </section>
+      </div>`;
+    document.body.appendChild(shell);
+    shell.querySelector('.ncr-close').onclick = closeRecord;
+    shell.addEventListener('click', e => { if (e.target === shell || e.target.classList.contains('ncr-stage')) closeRecord(); });
+    shell.querySelector('.ncr-refresh').onclick = async () => openRecord(lead, await getMeeting(lead.id));
   }
 
   async function openForLead(id) {
     try {
       const lead = await getLead(id);
-      openModal(lead, null);
+      openRecord(lead, null);
       const meeting = await getMeeting(id);
-      if (meeting) {
-        document.querySelector('.cr-backdrop')?.remove();
-        openModal(lead, meeting);
-      }
+      if (meeting && document.querySelector('.ncr-shell')) openRecord(lead, meeting);
     } catch (error) {
       console.error('Gesprächsakte konnte nicht geladen werden', error);
-      alert(`Gesprächsakte konnte nicht geöffnet werden: ${error.message || error}`);
     }
   }
 
