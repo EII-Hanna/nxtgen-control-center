@@ -22,6 +22,7 @@
   loadAsset('style','./client-intelligence.css');
   loadAsset('style','./fireflies-intelligence-ui.css');
   loadAsset('style','./kickoff-delivery.css');
+  loadAsset('style','./fulfillment-board.css');
   loadAsset('script','./lead-crm.js');
   loadAsset('script','./offer-builder.js');
   loadAsset('script','./integrations.js');
@@ -33,6 +34,7 @@
   loadAsset('script','./client-intelligence.js');
   loadAsset('script','./fireflies-intelligence-ui.js');
   loadAsset('script','./kickoff-delivery.js');
+  loadAsset('script','./fulfillment-board.js');
 
   async function loadDashboard(){
     const db=window.NXTGEN_DB, org=window.NXTGEN_ORG_ID; if(!db||!org)return;
