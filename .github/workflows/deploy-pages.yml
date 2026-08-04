@@ -40,10 +40,8 @@ jobs:
             echo "Supabase-Konfiguration fehlt; Veröffentlichung erfolgt im Demo-Modus."
           fi
 
-      - name: GitHub Pages aktivieren und konfigurieren
+      - name: GitHub Pages konfigurieren
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Statische App verpacken
         uses: actions/upload-pages-artifact@v3
