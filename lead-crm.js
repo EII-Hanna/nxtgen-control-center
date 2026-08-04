@@ -1,106 +1,22 @@
 (() => {
-  const customers = document.getElementById('customers');
-  if (!customers) return;
-  const stages = [
-    ['new','Neu'],['contacted','Kontaktiert'],['qualified','Qualifiziert'],['meeting_booked','Termin'],['offer_open','Angebot']
-  ];
-  let leads = [];
-
+  const customers=document.getElementById('customers'); if(!customers)return;
+  const acquisition=[['new','Neu'],['contacted','Kontaktiert'],['responded','Reaktion'],['qualified','Qualifiziert'],['meeting_offered','Termin angeboten'],['meeting_booked','Termin gebucht']];
+  const closing=[['meeting_booked','Termin gebucht'],['meeting_prepared','Vorbereitet'],['meeting_completed','Erstgespräch'],['need_confirmed','Bedarf bestätigt'],['solution_configured','Lösung'],['offer_open','Angebot'],['negotiation','Closing'],['contract_sent','Vertrag'],['won','Deal gewonnen']];
+  let leads=[]; let mode='acquisition';
   customers.classList.remove('empty');
-  customers.innerHTML = `
-    <div class="lead-cockpit">
-      <div class="lead-head">
-        <div><p class="eyebrow">SPRINT 1 · LEAD-TO-CONVERSATION</p><h2>Interessenten & Pipeline</h2><p>Alle Anfragen aus LinkedIn, E-Mail, Website, WhatsApp, Empfehlungen und manueller Erfassung.</p></div>
-        <button class="btn primary" id="focusLeadForm">+ Interessent anlegen</button>
-      </div>
-      <div class="lead-kpis">
-        <article class="lead-kpi"><span>OFFENE INTERESSENTEN</span><strong id="leadKpiOpen">0</strong><small>nicht gewonnen oder verloren</small></article>
-        <article class="lead-kpi"><span>PIPELINE-VOLUMEN</span><strong id="leadKpiValue">0 €</strong><small>gewichteter Forecast folgt</small></article>
-        <article class="lead-kpi"><span>TERMINE</span><strong id="leadKpiMeetings">0</strong><small>gebucht oder durchgeführt</small></article>
-        <article class="lead-kpi"><span>FOLLOW-UPS FÄLLIG</span><strong id="leadKpiFollowups">0</strong><small>heute oder überfällig</small></article>
-      </div>
-      <div class="lead-layout">
-        <section class="pipeline-board" id="pipelineBoard"></section>
-        <aside class="lead-side">
-          <h3>Interessent erfassen</h3>
-          <form class="lead-form" id="leadForm">
-            <div><label>UNTERNEHMEN</label><input id="leadCompany" required placeholder="Musterunternehmen"></div>
-            <div><label>ANSPRECHPARTNER</label><input id="leadContact" placeholder="Max Mustermann"></div>
-            <div><label>E-MAIL</label><input id="leadEmail" type="email" placeholder="max@firma.de"></div>
-            <div><label>TELEFON / WHATSAPP</label><input id="leadPhone" placeholder="+49 …"></div>
-            <div><label>QUELLE</label><select id="leadSource"><option value="linkedin">LinkedIn</option><option value="email">E-Mail</option><option value="website">Website</option><option value="whatsapp">WhatsApp</option><option value="referral">Empfehlung</option><option value="manual">Manuell</option><option value="other">Sonstige</option></select></div>
-            <div><label>BRANCHE</label><input id="leadIndustry" placeholder="Personalberatung"></div>
-            <div><label>POTENZIAL NETTO</label><input id="leadValue" type="number" min="0" value="0"></div>
-            <div><label>BEDARF / PROBLEM</label><textarea id="leadNeed" placeholder="Welches Problem soll gelöst werden?"></textarea></div>
-            <div><label>NÄCHSTER SCHRITT</label><input id="leadNext" placeholder="Erstgespräch vereinbaren"></div>
-            <div><label>FOLLOW-UP</label><input id="leadFollowup" type="datetime-local"></div>
-            <div class="lead-actions"><button type="reset" class="btn">Leeren</button><button type="submit" class="btn primary">Speichern</button></div>
-          </form>
-          <div class="followup-list"><p class="eyebrow">NÄCHSTE FOLLOW-UPS</p><div id="followupItems"></div></div>
-        </aside>
-      </div>
-    </div>`;
-
-  const $ = id => document.getElementById(id);
-  const money = value => new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Number(value||0));
-  const escapeHtml = value => { const d=document.createElement('div'); d.textContent=value ?? ''; return d.innerHTML; };
-
-  async function loadLeads(){
-    if (!window.NXTGEN_DB || !window.NXTGEN_ORG_ID) {
-      leads = JSON.parse(localStorage.getItem('nxtgen_demo_leads') || '[]');
-      render();
-      return;
-    }
-    const { data, error } = await window.NXTGEN_DB.from('leads').select('*').eq('organization_id',window.NXTGEN_ORG_ID).order('created_at',{ascending:false});
-    if (error) { console.error(error); return; }
-    leads = data || [];
-    render();
+  customers.innerHTML=`<div class="lead-cockpit"><div class="lead-head"><div><p class="eyebrow">NXTGEN SALES V1</p><h2>Zwei Prozesse. Eine saubere Übergabe.</h2><p>Prozess 1 erzeugt Termine. Prozess 2 verwandelt Termine in gewonnenen Umsatz.</p></div><button class="btn primary" id="focusLeadForm">+ Interessent</button></div>
+  <div class="sales-process-map"><div class="process-step active"><span>01</span><b>Lead → Termin</b><small>Akquise & Qualifizierung</small></div><i>→</i><div class="process-handoff"><b>Termin gebucht</b><small>automatische Übergabe</small></div><i>→</i><div class="process-step"><span>02</span><b>Termin → Deal</b><small>Gespräch, Angebot & Closing</small></div><i>→</i><div class="process-step"><span>03</span><b>Onboarding</b><small>Start nach Deal Won</small></div></div>
+  <div class="pipeline-tabs"><button class="active" data-mode="acquisition">Lead → Termin</button><button data-mode="closing">Termin → Deal gewonnen</button></div>
+  <div class="lead-kpis"><article class="lead-kpi"><span>OFFENE LEADS</span><strong id="leadKpiOpen">0</strong><small>Prozess 1</small></article><article class="lead-kpi"><span>GEBUCHTE TERMINE</span><strong id="leadKpiMeetings">0</strong><small>Übergaben an Closing</small></article><article class="lead-kpi"><span>CLOSING-PIPELINE</span><strong id="leadKpiValue">0 €</strong><small>offenes Potenzial</small></article><article class="lead-kpi"><span>DEALS GEWONNEN</span><strong id="leadKpiWon">0</strong><small>Vertrag + Zahlung</small></article></div>
+  <div class="lead-layout"><section><div class="pipeline-context" id="pipelineContext"></div><div class="pipeline-board" id="pipelineBoard"></div></section><aside class="lead-side"><h3>Interessent erfassen</h3><form class="lead-form" id="leadForm"><div><label>UNTERNEHMEN</label><input id="leadCompany" required></div><div><label>ANSPRECHPARTNER</label><input id="leadContact"></div><div><label>E-MAIL</label><input id="leadEmail" type="email"></div><div><label>QUELLE</label><select id="leadSource"><option value="linkedin">LinkedIn</option><option value="email">E-Mail</option><option value="website">Website</option><option value="whatsapp">WhatsApp</option><option value="referral">Empfehlung</option><option value="manual">Manuell</option></select></div><div><label>POTENZIAL NETTO</label><input id="leadValue" type="number" min="0" value="0"></div><div><label>BEDARF</label><textarea id="leadNeed"></textarea></div><div><label>NÄCHSTER SCHRITT</label><input id="leadNext"></div><div><label>FOLLOW-UP</label><input id="leadFollowup" type="datetime-local"></div><div class="lead-actions"><button type="reset" class="btn">Leeren</button><button type="submit" class="btn primary">Speichern</button></div></form><div class="followup-list"><p class="eyebrow">PROZESSREGEL</p><p class="rule-copy">„Termin gebucht“ erzeugt automatisch die Closing-Chance. „Deal gewonnen“ startet anschließend das Kunden-Onboarding.</p></div></aside></div></div>`;
+  const $=id=>document.getElementById(id); const money=v=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Number(v||0)); const esc=v=>{const d=document.createElement('div');d.textContent=v??'';return d.innerHTML};
+  async function persistStage(lead,stage){lead.stage=stage;if(window.NXTGEN_DB&&window.NXTGEN_ORG_ID){const {error}=await window.NXTGEN_DB.from('leads').update({stage,updated_at:new Date().toISOString()}).eq('id',lead.id);if(error){alert(error.message);return}}else localStorage.setItem('nxtgen_demo_leads',JSON.stringify(leads));render()}
+  async function load(){if(!window.NXTGEN_DB||!window.NXTGEN_ORG_ID){leads=JSON.parse(localStorage.getItem('nxtgen_demo_leads')||'[]');render();return}const {data,error}=await window.NXTGEN_DB.from('leads').select('*').eq('organization_id',window.NXTGEN_ORG_ID).order('created_at',{ascending:false});if(!error){leads=data||[];render()}}
+  function render(){const stages=mode==='acquisition'?acquisition:closing;const allowed=new Set(stages.map(x=>x[0]));$('pipelineContext').innerHTML=mode==='acquisition'?'<b>Ziel:</b> Aus einem Interessenten wird ein verbindlich gebuchter Termin.':'<b>Ziel:</b> Aus einem gebuchten Termin wird ein unterschriebener und bezahlter Deal.';$('pipelineBoard').style.gridTemplateColumns=`repeat(${stages.length},minmax(220px,1fr))`;$('pipelineBoard').innerHTML=stages.map(([key,label],idx)=>{const cards=leads.filter(x=>x.stage===key);return `<div class="pipeline-column"><div class="pipeline-column-head"><b>${label}</b><span>${cards.length}</span></div>${cards.map(c=>`<article class="lead-card"><div class="lead-card-top"><strong>${esc(c.company_name)}</strong><span class="lead-source">${esc(c.source)}</span></div><p>${esc(c.need_summary||c.next_step||'Noch keine Notiz')}</p><div class="lead-card-meta"><span>${esc(c.contact_name||'Ohne Kontakt')}</span><b class="lead-value">${money(c.estimated_value)}</b></div>${idx<stages.length-1?`<button class="stage-next" data-id="${c.id}" data-next="${stages[idx+1][0]}">Weiter → ${stages[idx+1][1]}</button>`:''}</article>`).join('')}</div>`}).join('');
+    $('leadKpiOpen').textContent=leads.filter(x=>acquisition.some(s=>s[0]===x.stage)&&x.stage!=='meeting_booked').length;$('leadKpiMeetings').textContent=leads.filter(x=>closing.some(s=>s[0]===x.stage)).length;$('leadKpiValue').textContent=money(leads.filter(x=>closing.some(s=>s[0]===x.stage)&&x.stage!=='won').reduce((s,x)=>s+Number(x.estimated_value||0),0));$('leadKpiWon').textContent=leads.filter(x=>x.stage==='won').length;
+    customers.querySelectorAll('.stage-next').forEach(b=>b.onclick=()=>{const lead=leads.find(x=>String(x.id)===b.dataset.id);if(lead)persistStage(lead,b.dataset.next)});
   }
-
-  function render(){
-    const board=$('pipelineBoard');
-    board.innerHTML=stages.map(([key,label])=>{
-      const cards=leads.filter(x=>x.stage===key);
-      return `<div class="pipeline-column" data-stage="${key}"><div class="pipeline-column-head"><b>${label}</b><span>${cards.length}</span></div>${cards.map(card=>`<article class="lead-card" data-id="${card.id}"><div class="lead-card-top"><strong>${escapeHtml(card.company_name)}</strong><span class="lead-source">${escapeHtml(card.source)}</span></div><p>${escapeHtml(card.need_summary||card.next_step||'Noch keine Bedarfsnotiz')}</p><div class="lead-card-meta"><span>${escapeHtml(card.contact_name||'Ohne Kontakt')}</span><b class="lead-value">${money(card.estimated_value)}</b></div></article>`).join('')}</div>`;
-    }).join('');
-    const open=leads.filter(x=>!['won','lost'].includes(x.stage));
-    $('leadKpiOpen').textContent=open.length;
-    $('leadKpiValue').textContent=money(open.reduce((s,x)=>s+Number(x.estimated_value||0),0));
-    $('leadKpiMeetings').textContent=leads.filter(x=>['meeting_booked','meeting_completed'].includes(x.stage)).length;
-    const now=Date.now(); const due=open.filter(x=>x.next_follow_up_at && new Date(x.next_follow_up_at).getTime()<=now);
-    $('leadKpiFollowups').textContent=due.length;
-    const next=open.filter(x=>x.next_follow_up_at).sort((a,b)=>new Date(a.next_follow_up_at)-new Date(b.next_follow_up_at)).slice(0,5);
-    $('followupItems').innerHTML=next.length?next.map(x=>`<div class="followup-item"><b>${escapeHtml(x.company_name)}</b><span>${new Intl.DateTimeFormat('de-DE',{dateStyle:'short',timeStyle:'short'}).format(new Date(x.next_follow_up_at))} · ${escapeHtml(x.next_step||'Follow-up')}</span></div>`).join(''):'<span style="font-size:10px;color:#69707b">Keine Follow-ups geplant.</span>';
-  }
-
-  $('leadForm').addEventListener('submit', async e=>{
-    e.preventDefault();
-    const payload={
-      organization_id:window.NXTGEN_ORG_ID,
-      company_name:$('leadCompany').value.trim(),
-      contact_name:$('leadContact').value.trim()||null,
-      email:$('leadEmail').value.trim()||null,
-      phone:$('leadPhone').value.trim()||null,
-      source:$('leadSource').value,
-      industry:$('leadIndustry').value.trim()||null,
-      stage:'new',
-      estimated_value:Number($('leadValue').value||0),
-      need_summary:$('leadNeed').value.trim()||null,
-      next_step:$('leadNext').value.trim()||null,
-      next_follow_up_at:$('leadFollowup').value?new Date($('leadFollowup').value).toISOString():null
-    };
-    if (!payload.company_name) return;
-    if (window.NXTGEN_DB && window.NXTGEN_ORG_ID) {
-      const { error }=await window.NXTGEN_DB.from('leads').insert(payload);
-      if(error){alert(`Speichern fehlgeschlagen: ${error.message}`);return;}
-    } else {
-      payload.id=crypto.randomUUID(); payload.created_at=new Date().toISOString();
-      const local=JSON.parse(localStorage.getItem('nxtgen_demo_leads')||'[]'); local.unshift(payload); localStorage.setItem('nxtgen_demo_leads',JSON.stringify(local));
-    }
-    e.target.reset(); $('leadValue').value=0; await loadLeads();
-  });
-
-  $('focusLeadForm').addEventListener('click',()=>$('leadCompany').focus());
-  window.addEventListener('nxtgen:ready',loadLeads);
-  setTimeout(loadLeads,300);
+  customers.querySelectorAll('.pipeline-tabs button').forEach(b=>b.onclick=()=>{customers.querySelectorAll('.pipeline-tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');mode=b.dataset.mode;render()});
+  $('leadForm').onsubmit=async e=>{e.preventDefault();const payload={organization_id:window.NXTGEN_ORG_ID,company_name:$('leadCompany').value.trim(),contact_name:$('leadContact').value.trim()||null,email:$('leadEmail').value.trim()||null,source:$('leadSource').value,stage:'new',estimated_value:Number($('leadValue').value||0),need_summary:$('leadNeed').value.trim()||null,next_step:$('leadNext').value.trim()||null,next_follow_up_at:$('leadFollowup').value?new Date($('leadFollowup').value).toISOString():null};if(window.NXTGEN_DB&&window.NXTGEN_ORG_ID){const {error}=await window.NXTGEN_DB.from('leads').insert(payload);if(error){alert(error.message);return}}else{payload.id=crypto.randomUUID();payload.created_at=new Date().toISOString();leads.unshift(payload);localStorage.setItem('nxtgen_demo_leads',JSON.stringify(leads))}e.target.reset();$('leadValue').value=0;load()};
+  $('focusLeadForm').onclick=()=>$('leadCompany').focus();window.addEventListener('nxtgen:ready',load);setTimeout(load,300);
 })();
