@@ -15,20 +15,13 @@
   const nameLabel = nameInput?.previousElementSibling;
 
   let registerMode = false;
-  let bootstrapPromise = null;
-  let db = null;
-  let opening = false;
+  let appOpen = false;
 
   const setMessage = (text = '', type = '') => {
     if (!message) return;
-    message.innerHTML = text;
+    message.textContent = text;
     message.className = type ? `auth-message ${type}` : 'auth-message';
   };
-
-  const withTimeout = (promise, ms, label) => Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} hat zu lange gedauert.`)), ms))
-  ]);
 
   const setLoading = (loading, text = '') => {
     if (!submitButton) return;
@@ -37,50 +30,14 @@
   };
 
   const showApp = () => {
-    opening = true;
+    appOpen = true;
     setup?.classList.add('hidden');
     app?.classList.remove('hidden');
     window.dispatchEvent(new CustomEvent('nxtgen:ready'));
   };
 
-  const ensureRecoveryButton = () => {
-    if (!authForm || document.getElementById('authForgot')) return;
-    const button = document.createElement('button');
-    button.id = 'authForgot';
-    button.type = 'button';
-    button.className = 'auth-link';
-    button.textContent = 'Passwort vergessen?';
-    button.addEventListener('click', async () => {
-      const email = emailInput?.value.trim();
-      if (!email) {
-        setMessage('Trage zuerst deine E-Mail-Adresse ein.', 'error');
-        emailInput?.focus();
-        return;
-      }
-      button.disabled = true;
-      button.textContent = 'Reset-Link wird gesendet …';
-      try {
-        const { error } = await withTimeout(
-          db.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + window.location.pathname
-          }),
-          12000,
-          'Passwort-Reset'
-        );
-        if (error) throw error;
-        setMessage('Reset-Link wurde gesendet. Prüfe auch den Spam-Ordner.', 'success');
-      } catch (error) {
-        setMessage(error.message || 'Reset-Link konnte nicht gesendet werden.', 'error');
-      } finally {
-        button.disabled = false;
-        button.textContent = 'Passwort vergessen?';
-      }
-    });
-    authForm.appendChild(button);
-  };
-
   const showAuth = () => {
-    opening = false;
+    appOpen = false;
     setup?.classList.remove('hidden');
     app?.classList.add('hidden');
     authForm?.classList.remove('hidden');
@@ -94,46 +51,11 @@
     nameLabel?.classList.toggle('hidden', !registerMode);
 
     if (title) title.textContent = registerMode ? 'NXTGEN Account erstellen' : 'Bei NXTGEN anmelden';
-    if (subtitle) {
-      subtitle.textContent = registerMode
-        ? 'Registriere deinen Administratorzugang. Nach Bestätigung genügt die normale Anmeldung.'
-        : 'Melde dich mit deinem bestehenden NXTGEN-Administratorzugang an.';
-    }
+    if (subtitle) subtitle.textContent = registerMode
+      ? 'Registriere deinen Administratorzugang.'
+      : 'Melde dich mit deinem bestehenden NXTGEN-Administratorzugang an.';
     if (toggle) toggle.textContent = registerMode ? 'Bereits registriert? Anmelden' : 'Noch kein Konto? Registrieren';
-
-    ensureRecoveryButton();
-    document.getElementById('authForgot')?.classList.toggle('hidden', registerMode);
     setLoading(false);
-  };
-
-  const showRecovery = error => {
-    opening = false;
-    setup?.classList.remove('hidden');
-    app?.classList.add('hidden');
-    authForm?.classList.add('hidden');
-    orgForm?.classList.add('hidden');
-    toggle?.classList.add('hidden');
-    if (title) title.textContent = 'NXTGEN konnte nicht geöffnet werden';
-    if (subtitle) subtitle.textContent = 'Die Anmeldung war erfolgreich, aber der Organisationszugriff konnte nicht geladen werden.';
-    setMessage(
-      `<div>${String(error?.message || 'Unbekannter Startfehler')}</div>` +
-      '<div class="auth-recovery-actions">' +
-      '<button type="button" class="auth-primary" id="authRetry">Erneut versuchen</button>' +
-      '<button type="button" class="auth-secondary" id="authReset">Abmelden & neu anmelden</button>' +
-      '</div>',
-      'error'
-    );
-    document.getElementById('authRetry')?.addEventListener('click', () => {
-      bootstrapPromise = null;
-      bootstrapAndOpen();
-    });
-    document.getElementById('authReset')?.addEventListener('click', async () => {
-      try { await withTimeout(db.auth.signOut(), 8000, 'Abmeldung'); } catch (_) {}
-      bootstrapPromise = null;
-      registerMode = false;
-      setMessage('');
-      showAuth();
-    });
   };
 
   if (!cfg.supabaseUrl || !cfg.supabasePublishableKey || !window.supabase) {
@@ -143,70 +65,24 @@
     return;
   }
 
-  db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey, {
+  const db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   });
   window.NXTGEN_DB = db;
 
-  const resolveOrganization = async session => {
-    const membershipResult = await withTimeout(
-      db.from('organization_members')
-        .select('organization_id,role')
-        .eq('user_id', session.user.id)
-        .limit(1)
-        .maybeSingle(),
-      10000,
-      'Organisationsprüfung'
-    );
+  const openForSession = async session => {
+    if (!session || appOpen) return;
+    setMessage('NXTGEN wird geöffnet …');
 
-    if (membershipResult.error) throw membershipResult.error;
-    if (membershipResult.data?.organization_id) return membershipResult.data.organization_id;
+    const { data, error } = await db.rpc('ensure_internal_organization');
+    if (error) throw error;
 
-    const bootstrapResult = await withTimeout(
-      db.rpc('ensure_internal_organization'),
-      12000,
-      'Organisationseinrichtung'
-    );
-
-    if (bootstrapResult.error) throw bootstrapResult.error;
-    const row = Array.isArray(bootstrapResult.data) ? bootstrapResult.data[0] : bootstrapResult.data;
+    const row = Array.isArray(data) ? data[0] : data;
     if (!row?.organization_id) throw new Error('Organisation konnte nicht geladen werden.');
-    return row.organization_id;
-  };
 
-  const bootstrapAndOpen = (knownSession = null) => {
-    if (opening) return Promise.resolve();
-    if (bootstrapPromise) return bootstrapPromise;
-
-    bootstrapPromise = (async () => {
-      try {
-        setMessage('NXTGEN wird geöffnet …');
-        let session = knownSession;
-        if (!session) {
-          const sessionResult = await withTimeout(db.auth.getSession(), 8000, 'Sitzungsprüfung');
-          if (sessionResult.error) throw sessionResult.error;
-          session = sessionResult.data?.session;
-        }
-
-        if (!session) {
-          setMessage('');
-          showAuth();
-          return;
-        }
-
-        const organizationId = await resolveOrganization(session);
-        window.NXTGEN_ORG_ID = organizationId;
-        setMessage('');
-        showApp();
-      } catch (error) {
-        console.error('NXTGEN bootstrap failed', error);
-        showRecovery(error);
-      } finally {
-        bootstrapPromise = null;
-      }
-    })();
-
-    return bootstrapPromise;
+    window.NXTGEN_ORG_ID = row.organization_id;
+    setMessage('');
+    showApp();
   };
 
   toggle?.addEventListener('click', () => {
@@ -229,21 +105,17 @@
 
       if (registerMode) {
         if (!fullName) throw new Error('Bitte deinen vollständigen Namen eintragen.');
-        const { data, error } = await withTimeout(db.auth.signUp({
+        const { data, error } = await db.auth.signUp({
           email,
           password,
           options: {
             data: { full_name: fullName },
             emailRedirectTo: window.location.origin + window.location.pathname
           }
-        }), 12000, 'Registrierung');
-
+        });
         if (error) throw error;
-        if (data.session) {
-          bootstrapPromise = null;
-          opening = false;
-          await bootstrapAndOpen(data.session);
-        } else {
+        if (data.session) await openForSession(data.session);
+        else {
           registerMode = false;
           showAuth();
           setMessage('Bestätige deine E-Mail und melde dich danach an.', 'success');
@@ -251,19 +123,14 @@
         return;
       }
 
-      const { data, error } = await withTimeout(
-        db.auth.signInWithPassword({ email, password }),
-        12000,
-        'Anmeldung'
-      );
+      const { data, error } = await db.auth.signInWithPassword({ email, password });
       if (error) throw error;
       if (!data.session) throw new Error('Supabase hat keine gültige Sitzung zurückgegeben.');
-
-      bootstrapPromise = null;
-      opening = false;
-      await bootstrapAndOpen(data.session);
+      await openForSession(data.session);
     } catch (error) {
+      console.error('NXTGEN auth failed', error);
       setMessage(error.message || 'Anmeldung fehlgeschlagen.', 'error');
+      showAuth();
     } finally {
       setLoading(false);
     }
@@ -272,16 +139,27 @@
   orgForm?.classList.add('hidden');
 
   db.auth.onAuthStateChange((event, session) => {
-    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session && !opening) {
-      bootstrapPromise = null;
-      setTimeout(() => bootstrapAndOpen(session), 0);
-    }
-    if (event === 'SIGNED_OUT') {
-      opening = false;
-      bootstrapPromise = null;
-      showAuth();
+    if (event === 'SIGNED_OUT') showAuth();
+    if (event === 'SIGNED_IN' && session && !appOpen) {
+      setTimeout(() => openForSession(session).catch(error => {
+        console.error('NXTGEN session open failed', error);
+        setMessage(error.message || 'NXTGEN konnte nicht geöffnet werden.', 'error');
+        showAuth();
+      }), 0);
     }
   });
 
-  bootstrapAndOpen();
+  db.auth.getSession().then(({ data, error }) => {
+    if (error) {
+      setMessage(error.message || 'Sitzung konnte nicht geprüft werden.', 'error');
+      showAuth();
+      return;
+    }
+    if (data.session) openForSession(data.session).catch(error => {
+      console.error('NXTGEN initial session failed', error);
+      setMessage(error.message || 'NXTGEN konnte nicht geöffnet werden.', 'error');
+      showAuth();
+    });
+    else showAuth();
+  });
 })();
