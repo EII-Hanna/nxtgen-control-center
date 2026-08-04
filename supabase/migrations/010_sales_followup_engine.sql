@@ -40,6 +40,7 @@ set search_path=public
 as $$
 declare
   v_count integer := 0;
+  v_rows integer := 0;
 begin
   if not public.is_org_member(p_organization_id) then
     raise exception 'Kein Zugriff auf Organisation';
@@ -66,7 +67,8 @@ begin
     and l.next_follow_up_at is not null
     and l.stage not in ('won','lost')
   on conflict (organization_id, lead_id, automation_key) do nothing;
-  get diagnostics v_count = row_count;
+  get diagnostics v_rows = row_count;
+  v_count := v_count + v_rows;
 
   -- Meeting reminder 24 hours before
   insert into public.sales_tasks(
@@ -90,7 +92,8 @@ begin
     and coalesce(l.meeting_status,'planned') in ('planned','booked')
     and l.stage not in ('won','lost')
   on conflict (organization_id, lead_id, automation_key) do nothing;
-  get diagnostics v_count = v_count + row_count;
+  get diagnostics v_rows = row_count;
+  v_count := v_count + v_rows;
 
   -- Meeting reminder 1 hour before
   insert into public.sales_tasks(
@@ -114,7 +117,8 @@ begin
     and coalesce(l.meeting_status,'planned') in ('planned','booked')
     and l.stage not in ('won','lost')
   on conflict (organization_id, lead_id, automation_key) do nothing;
-  get diagnostics v_count = v_count + row_count;
+  get diagnostics v_rows = row_count;
+  v_count := v_count + v_rows;
 
   -- No-show recovery on the next business day (simple +1 day MVP)
   insert into public.sales_tasks(
@@ -137,7 +141,8 @@ begin
     and l.meeting_status = 'no_show'
     and l.stage not in ('won','lost')
   on conflict (organization_id, lead_id, automation_key) do nothing;
-  get diagnostics v_count = v_count + row_count;
+  get diagnostics v_rows = row_count;
+  v_count := v_count + v_rows;
 
   return v_count;
 end;
