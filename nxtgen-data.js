@@ -28,6 +28,7 @@
   loadAsset('style','./value-story.css');
   loadAsset('style','./renewal-expansion.css');
   loadAsset('style','./backoffice.css');
+  loadAsset('style','./commercial-finance.css');
   loadAsset('script','./lead-crm.js');
   loadAsset('script','./offer-builder.js');
   loadAsset('script','./integrations.js');
@@ -45,6 +46,7 @@
   loadAsset('script','./value-story.js');
   loadAsset('script','./renewal-expansion.js');
   loadAsset('script','./backoffice.js');
+  loadAsset('script','./commercial-finance.js');
 
   async function loadDashboard(){
     const db=window.NXTGEN_DB, org=window.NXTGEN_ORG_ID; if(!db||!org)return;
