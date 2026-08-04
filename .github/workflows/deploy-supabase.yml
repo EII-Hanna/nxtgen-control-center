@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/**'
+      - 'supabase/functions/**'
       - '.github/workflows/deploy-supabase.yml'
 
 permissions:
@@ -42,3 +43,9 @@ jobs:
 
       - name: Migrationen deployen
         run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Edge Functions deployen
+        run: |
+          if [ -d "supabase/functions/fireflies-webhook" ]; then
+            supabase functions deploy fireflies-webhook --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+          fi
