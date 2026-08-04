@@ -16,8 +16,7 @@
   }
 
   // UI architecture reset: only the five daily operating areas are loaded.
-  // Existing feature files and database structures remain in the repository,
-  // but are no longer mounted as stacked dashboard sections.
-  loadAsset('style', './ui-reset.css?v=20260804-2113');
-  loadAsset('script', './ui-reset.js?v=20260804-2113');
+  loadAsset('style', './ui-reset.css?v=20260804-2122');
+  loadAsset('script', './ui-reset.js?v=20260804-2122');
+  loadAsset('script', './meeting-provider-neutral.js?v=20260804-2122');
 })();
