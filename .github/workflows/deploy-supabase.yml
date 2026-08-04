@@ -50,7 +50,6 @@ jobs:
               mv "$file" supabase/migrations-disabled/
             fi
           done
-          echo 'Aktive Migrationen:'
           ls -1 supabase/migrations
 
       - name: Projekt verknüpfen
@@ -61,3 +60,6 @@ jobs:
 
       - name: Lead Intake Webhook deployen
         run: supabase functions deploy lead-intake --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+
+      - name: Meeting Intake Webhook deployen
+        run: supabase functions deploy meeting-intake --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
