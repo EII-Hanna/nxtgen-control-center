@@ -21,6 +21,7 @@
   loadAsset('style','./delivery-lifecycle.css');
   loadAsset('style','./client-intelligence.css');
   loadAsset('style','./fireflies-intelligence-ui.css');
+  loadAsset('style','./kickoff-delivery.css');
   loadAsset('script','./lead-crm.js');
   loadAsset('script','./offer-builder.js');
   loadAsset('script','./integrations.js');
@@ -31,13 +32,14 @@
   loadAsset('script','./delivery-lifecycle.js');
   loadAsset('script','./client-intelligence.js');
   loadAsset('script','./fireflies-intelligence-ui.js');
+  loadAsset('script','./kickoff-delivery.js');
 
   async function loadDashboard(){
     const db=window.NXTGEN_DB, org=window.NXTGEN_ORG_ID; if(!db||!org)return;
     const [{count:clients},{data:subs},{data:projectRows}] = await Promise.all([
       db.from('clients').select('*',{count:'exact',head:true}).eq('organization_id',org).eq('status','active'),
       db.from('subscriptions').select('monthly_price,status,client:clients!inner(organization_id)').eq('client.organization_id',org).eq('status','active'),
-      db.from('projects').select('id,status,client:clients!inner(organization_id)').eq('client.organization_id',org).neq('status','completed')
+      db.from('delivery_projects').select('id,status').eq('organization_id',org).neq('status','completed')
     ]);
     const cards=document.querySelectorAll('[data-kpi]');
     const values={clients:clients||0,mrr:money((subs||[]).reduce((s,x)=>s+Number(x.monthly_price||0),0)),modules:(subs||[]).length,projects:(projectRows||[]).length};
