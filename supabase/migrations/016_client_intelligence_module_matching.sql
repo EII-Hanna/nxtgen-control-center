@@ -39,9 +39,16 @@ create table if not exists public.client_module_recommendations (
   approved_at timestamptz,
   approved_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique(workspace_id, product_code, coalesce(module_code,''), snapshot_id)
+  updated_at timestamptz not null default now()
 );
+
+create unique index if not exists ux_client_module_recommendations_identity
+  on public.client_module_recommendations (
+    workspace_id,
+    product_code,
+    coalesce(module_code, ''),
+    coalesce(snapshot_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  );
 
 create table if not exists public.client_repo_sections (
   id uuid primary key default gen_random_uuid(),
@@ -64,10 +71,15 @@ alter table public.client_intelligence_snapshots enable row level security;
 alter table public.client_module_recommendations enable row level security;
 alter table public.client_repo_sections enable row level security;
 
+drop policy if exists client_intelligence_org_access on public.client_intelligence_snapshots;
 create policy client_intelligence_org_access on public.client_intelligence_snapshots for all
 using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+
+drop policy if exists client_module_recommendations_org_access on public.client_module_recommendations;
 create policy client_module_recommendations_org_access on public.client_module_recommendations for all
 using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+
+drop policy if exists client_repo_sections_org_access on public.client_repo_sections;
 create policy client_repo_sections_org_access on public.client_repo_sections for all
 using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
 
