@@ -15,8 +15,10 @@
     document.body.appendChild(script);
   }
 
-  // UI architecture reset: only the five daily operating areas are loaded.
-  loadAsset('style', './ui-reset.css?v=20260804-2122');
-  loadAsset('script', './ui-reset.js?v=20260804-2122');
-  loadAsset('script', './meeting-provider-neutral.js?v=20260804-2122');
+  // Stable operating surface plus the first production automation workflow.
+  loadAsset('style', './ui-reset.css?v=20260804-2137');
+  loadAsset('style', './automation-hub.css?v=20260804-2137');
+  loadAsset('script', './ui-reset.js?v=20260804-2137');
+  loadAsset('script', './meeting-provider-neutral.js?v=20260804-2137');
+  loadAsset('script', './automation-hub.js?v=20260804-2137');
 })();
