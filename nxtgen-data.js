@@ -16,11 +16,13 @@
   loadAsset('style','./integrations.css');
   loadAsset('style','./sales-task-center.css');
   loadAsset('style','./discovery.css');
+  loadAsset('style','./document-center.css');
   loadAsset('script','./lead-crm.js');
   loadAsset('script','./offer-builder.js');
   loadAsset('script','./integrations.js');
   loadAsset('script','./sales-task-center.js');
   loadAsset('script','./discovery.js');
+  loadAsset('script','./document-center.js');
 
   async function loadDashboard(){
     const db=window.NXTGEN_DB, org=window.NXTGEN_ORG_ID; if(!db||!org)return;
