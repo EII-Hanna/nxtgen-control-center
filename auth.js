@@ -174,16 +174,20 @@
     return row.organization_id;
   };
 
-  const bootstrapAndOpen = () => {
+  const bootstrapAndOpen = (knownSession = null) => {
     if (opening) return Promise.resolve();
     if (bootstrapPromise) return bootstrapPromise;
 
     bootstrapPromise = (async () => {
       try {
         setMessage('NXTGEN wird geöffnet …');
-        const sessionResult = await withTimeout(db.auth.getSession(), 8000, 'Sitzungsprüfung');
-        if (sessionResult.error) throw sessionResult.error;
-        const session = sessionResult.data?.session;
+        let session = knownSession;
+        if (!session) {
+          const sessionResult = await withTimeout(db.auth.getSession(), 8000, 'Sitzungsprüfung');
+          if (sessionResult.error) throw sessionResult.error;
+          session = sessionResult.data?.session;
+        }
+
         if (!session) {
           setMessage('');
           showAuth();
@@ -235,8 +239,11 @@
         }), 12000, 'Registrierung');
 
         if (error) throw error;
-        if (data.session) await bootstrapAndOpen();
-        else {
+        if (data.session) {
+          bootstrapPromise = null;
+          opening = false;
+          await bootstrapAndOpen(data.session);
+        } else {
           registerMode = false;
           showAuth();
           setMessage('Bestätige deine E-Mail und melde dich danach an.', 'success');
@@ -251,7 +258,10 @@
       );
       if (error) throw error;
       if (!data.session) throw new Error('Supabase hat keine gültige Sitzung zurückgegeben.');
-      await bootstrapAndOpen();
+
+      bootstrapPromise = null;
+      opening = false;
+      await bootstrapAndOpen(data.session);
     } catch (error) {
       setMessage(error.message || 'Anmeldung fehlgeschlagen.', 'error');
     } finally {
@@ -261,7 +271,11 @@
 
   orgForm?.classList.add('hidden');
 
-  db.auth.onAuthStateChange(event => {
+  db.auth.onAuthStateChange((event, session) => {
+    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session && !opening) {
+      bootstrapPromise = null;
+      setTimeout(() => bootstrapAndOpen(session), 0);
+    }
     if (event === 'SIGNED_OUT') {
       opening = false;
       bootstrapPromise = null;
