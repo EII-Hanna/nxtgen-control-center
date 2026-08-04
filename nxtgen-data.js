@@ -20,6 +20,7 @@
   loadAsset('style','./onboarding.css');
   loadAsset('style','./delivery-lifecycle.css');
   loadAsset('style','./client-intelligence.css');
+  loadAsset('style','./fireflies-intelligence-ui.css');
   loadAsset('script','./lead-crm.js');
   loadAsset('script','./offer-builder.js');
   loadAsset('script','./integrations.js');
@@ -29,6 +30,7 @@
   loadAsset('script','./onboarding.js');
   loadAsset('script','./delivery-lifecycle.js');
   loadAsset('script','./client-intelligence.js');
+  loadAsset('script','./fireflies-intelligence-ui.js');
 
   async function loadDashboard(){
     const db=window.NXTGEN_DB, org=window.NXTGEN_ORG_ID; if(!db||!org)return;
