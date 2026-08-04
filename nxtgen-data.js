@@ -16,6 +16,7 @@
   loadAsset('style','./integrations.css');
   loadAsset('style','./sales-task-center.css');
   loadAsset('style','./discovery.css');
+  loadAsset('style','./commercial-orchestrator.css');
   loadAsset('style','./document-center.css');
   loadAsset('style','./onboarding.css');
   loadAsset('style','./delivery-lifecycle.css');
@@ -35,6 +36,7 @@
   loadAsset('script','./integrations.js');
   loadAsset('script','./sales-task-center.js');
   loadAsset('script','./discovery.js');
+  loadAsset('script','./commercial-orchestrator.js');
   loadAsset('script','./document-center.js');
   loadAsset('script','./onboarding.js');
   loadAsset('script','./delivery-lifecycle.js');
