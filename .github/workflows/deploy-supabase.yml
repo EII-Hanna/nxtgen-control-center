@@ -6,7 +6,6 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/**'
-      - 'supabase/functions/**'
       - '.github/workflows/deploy-supabase.yml'
 
 permissions:
@@ -38,22 +37,23 @@ jobs:
           test -n "$SUPABASE_DB_PASSWORD" || (echo 'SUPABASE_DB_PASSWORD fehlt' && exit 1)
           test -n "$SUPABASE_PROJECT_REF" || (echo 'SUPABASE_PROJECT_REF fehlt' && exit 1)
 
+      - name: Stabilen Release vorbereiten
+        run: |
+          mkdir -p supabase/migrations-disabled
+          for file in supabase/migrations/*.sql; do
+            base=$(basename "$file")
+            number=${base%%_*}
+            number=$((10#$number))
+            if [ "$number" -gt 18 ]; then
+              echo "Quarantäne: $base"
+              mv "$file" supabase/migrations-disabled/
+            fi
+          done
+          echo 'Aktive Migrationen:'
+          ls -1 supabase/migrations
+
       - name: Projekt verknüpfen
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
 
-      - name: Migrationen deployen
+      - name: Stabilen Datenbankkern deployen
         run: supabase db push --password "$SUPABASE_DB_PASSWORD"
-
-      - name: Edge Functions deployen
-        run: |
-          for function_dir in supabase/functions/*; do
-            if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
-              function_name=$(basename "$function_dir")
-              echo "Deploying $function_name"
-              if [ "$function_name" = "fireflies-webhook" ] || [ "$function_name" = "delivery-automation-callback" ]; then
-                supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
-              else
-                supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_REF"
-              fi
-            fi
-          done
