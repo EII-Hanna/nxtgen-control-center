@@ -1,19 +1,21 @@
 -- NXTGEN Meeting Intelligence: Fireflies Notetaker, transcripts and sales handoff
 
 insert into public.integration_catalog
-  (code, name, category, auth_type, description, capabilities, status)
+  (key, name, category, auth_type, description, icon, capabilities, is_active)
 values
   ('fireflies', 'Fireflies.ai', 'meeting_intelligence', 'api_key',
    'Notetaker für Erstgespräche mit Transkript, Zusammenfassung und Action Items.',
+   'F',
    '["meeting.transcribed","meeting.summarized","transcript.read","summary.read","action_items.read"]'::jsonb,
-   'active')
-on conflict (code) do update set
+   true)
+on conflict (key) do update set
   name = excluded.name,
   category = excluded.category,
   auth_type = excluded.auth_type,
   description = excluded.description,
+  icon = excluded.icon,
   capabilities = excluded.capabilities,
-  status = excluded.status;
+  is_active = excluded.is_active;
 
 create table if not exists public.meeting_intelligence_records (
   id uuid primary key default gen_random_uuid(),
@@ -116,10 +118,7 @@ begin
 
   update public.leads set
     need_summary=coalesce(nullif(v_record.summary_overview,''), need_summary),
-    next_step=coalesce(
-      nullif(v_record.action_items->>0,''),
-      next_step
-    ),
+    next_step=coalesce(nullif(v_record.action_items->>0,''), next_step),
     last_contact_at=coalesce(v_record.started_at, now()),
     updated_at=now()
   where id=p_lead_id;
