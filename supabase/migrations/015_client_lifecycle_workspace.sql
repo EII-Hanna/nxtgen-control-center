@@ -56,7 +56,8 @@ create table if not exists public.client_weekly_checkins (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   workspace_id uuid not null references public.client_workspaces(id) on delete cascade,
-  meeting_record_id uuid references public.meeting_intelligence_records(id) on delete set null,
+  meeting_source text,
+  meeting_reference text,
   period_start date not null,
   summary text,
   wins jsonb not null default '[]'::jsonb,
@@ -105,12 +106,24 @@ alter table public.client_weekly_checkins enable row level security;
 alter table public.client_value_events enable row level security;
 alter table public.client_opportunities enable row level security;
 
-create policy client_workspaces_org_access on public.client_workspaces for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
-create policy client_context_assets_org_access on public.client_context_assets for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
-create policy client_roadmap_items_org_access on public.client_roadmap_items for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
-create policy client_weekly_checkins_org_access on public.client_weekly_checkins for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
-create policy client_value_events_org_access on public.client_value_events for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
-create policy client_opportunities_org_access on public.client_opportunities for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+do $$ begin
+  create policy client_workspaces_org_access on public.client_workspaces for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy client_context_assets_org_access on public.client_context_assets for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy client_roadmap_items_org_access on public.client_roadmap_items for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy client_weekly_checkins_org_access on public.client_weekly_checkins for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy client_value_events_org_access on public.client_value_events for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy client_opportunities_workspace_status on public.client_opportunities for all using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id));
+exception when duplicate_object then null; end $$;
 
 create index if not exists idx_client_workspaces_org_status on public.client_workspaces(organization_id,status);
 create index if not exists idx_client_context_workspace_type on public.client_context_assets(workspace_id,asset_type,created_at desc);
