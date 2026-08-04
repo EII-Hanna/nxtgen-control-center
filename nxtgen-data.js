@@ -15,11 +15,11 @@
     document.body.appendChild(script);
   }
 
-  loadAsset('style', './ui-reset.css?v=20260804-2148');
-  loadAsset('style', './automation-hub.css?v=20260804-2148');
-  loadAsset('style', './sales-conversation-record.css?v=20260804-2148');
-  loadAsset('script', './ui-reset.js?v=20260804-2148');
-  loadAsset('script', './meeting-provider-neutral.js?v=20260804-2148');
-  loadAsset('script', './automation-hub.js?v=20260804-2148');
-  loadAsset('script', './sales-conversation-record.js?v=20260804-2148');
+  loadAsset('style', './ui-reset.css?v=20260804-2155');
+  loadAsset('style', './automation-hub.css?v=20260804-2155');
+  loadAsset('style', './sales-conversation-record.css?v=20260804-2155');
+  loadAsset('script', './ui-reset.js?v=20260804-2155');
+  loadAsset('script', './meeting-provider-neutral.js?v=20260804-2155');
+  loadAsset('script', './automation-hub.js?v=20260804-2155');
+  loadAsset('script', './sales-conversation-record.js?v=20260804-2155');
 })();
