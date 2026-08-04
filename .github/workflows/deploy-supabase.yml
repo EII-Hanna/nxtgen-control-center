@@ -45,7 +45,7 @@ jobs:
             base=$(basename "$file")
             number=${base%%_*}
             number=$((10#$number))
-            if [ "$number" -gt 18 ]; then
+            if [ "$number" -gt 19 ]; then
               echo "Quarantäne: $base"
               mv "$file" supabase/migrations-disabled/
             fi
