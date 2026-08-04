@@ -25,6 +25,7 @@
   loadAsset('style','./fulfillment-board.css');
   loadAsset('style','./automation-execution-ui.css');
   loadAsset('style','./weekly-accountability.css');
+  loadAsset('style','./value-story.css');
   loadAsset('script','./lead-crm.js');
   loadAsset('script','./offer-builder.js');
   loadAsset('script','./integrations.js');
@@ -39,6 +40,7 @@
   loadAsset('script','./fulfillment-board.js');
   loadAsset('script','./automation-execution-ui.js');
   loadAsset('script','./weekly-accountability.js');
+  loadAsset('script','./value-story.js');
 
   async function loadDashboard(){
     const db=window.NXTGEN_DB, org=window.NXTGEN_ORG_ID; if(!db||!org)return;
