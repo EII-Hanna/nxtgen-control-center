@@ -17,22 +17,24 @@
   loadAsset('style','./sales-task-center.css');
   loadAsset('style','./discovery.css');
   loadAsset('style','./document-center.css');
+  loadAsset('style','./onboarding.css');
   loadAsset('script','./lead-crm.js');
   loadAsset('script','./offer-builder.js');
   loadAsset('script','./integrations.js');
   loadAsset('script','./sales-task-center.js');
   loadAsset('script','./discovery.js');
   loadAsset('script','./document-center.js');
+  loadAsset('script','./onboarding.js');
 
   async function loadDashboard(){
     const db=window.NXTGEN_DB, org=window.NXTGEN_ORG_ID; if(!db||!org)return;
-    const [{count:clients},{data:subs},{count:projects}] = await Promise.all([
+    const [{count:clients},{data:subs},{data:projectRows}] = await Promise.all([
       db.from('clients').select('*',{count:'exact',head:true}).eq('organization_id',org).eq('status','active'),
       db.from('subscriptions').select('monthly_price,status,client:clients!inner(organization_id)').eq('client.organization_id',org).eq('status','active'),
-      db.from('projects').select('*',{count:'exact',head:true}).eq('organization_id',org).neq('status','completed')
+      db.from('projects').select('id,status,client:clients!inner(organization_id)').eq('client.organization_id',org).neq('status','completed')
     ]);
     const cards=document.querySelectorAll('[data-kpi]');
-    const values={clients:clients||0,mrr:money((subs||[]).reduce((s,x)=>s+Number(x.monthly_price||0),0)),modules:(subs||[]).length,projects:projects||0};
+    const values={clients:clients||0,mrr:money((subs||[]).reduce((s,x)=>s+Number(x.monthly_price||0),0)),modules:(subs||[]).length,projects:(projectRows||[]).length};
     cards.forEach(card=>{if(values[card.dataset.kpi]!==undefined)card.textContent=values[card.dataset.kpi]});
   }
   window.addEventListener('nxtgen:ready',loadDashboard);
